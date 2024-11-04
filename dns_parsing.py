@@ -21,11 +21,20 @@ def parse_dns_query(data):
 
     while length != 0:
         offset += 1
-        domain.append(data[offset:offset + length].decode())  # Добавляем часть домена
+        part = data[offset:offset + length].decode()  # Часть имени (или IP-адреса для PTR)
+        domain.append(part)
         offset += length
         length = data[offset]
 
-    return ".".join(domain)  # Возвращаем полное доменное имя
+    # Обрабатываем обратный запрос (PTR)
+    if domain[-2:] == ["in-addr", "arpa"]:
+        # Обратные запросы записаны в виде 1.0.0.127.in-addr.arpa, их нужно развернуть
+        ip_parts = domain[:-2]  # Получаем части IP-адреса
+        ip_parts.reverse()  # Разворачиваем их
+        return ".".join(ip_parts)  # Возвращаем строку с IP-адресом
+
+    # Стандартный доменный запрос
+    return ".".join(domain)  # Возвращаем доменное имя
 
 
 class ServerResponseParser:
