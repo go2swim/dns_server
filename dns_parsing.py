@@ -15,45 +15,44 @@ def create_dns_request(domain):
 
 
 def parse_dns_query(data):
-    domain = []
-    offset = 12  # Начало секции Question после заголовка
-    length = data[offset]
-
-    while length != 0:
-        offset += 1
-        part = data[offset:offset + length].decode()  # Часть имени (или IP-адреса для PTR)
-        domain.append(part)
-        offset += length
+    offset = 12
+    domain_parts = []
+    while data[offset] != 0:
         length = data[offset]
-
-    # Обрабатываем обратный запрос (PTR)
-    if domain[-2:] == ["in-addr", "arpa"]:
-        # Обратные запросы записаны в виде 1.0.0.127.in-addr.arpa, их нужно развернуть
-        ip_parts = domain[:-2]  # Получаем части IP-адреса
-        ip_parts.reverse()  # Разворачиваем их
-        return ".".join(ip_parts)  # Возвращаем строку с IP-адресом
-
-    # Стандартный доменный запрос
-    return ".".join(domain)  # Возвращаем доменное имя
+        domain_parts.append(data[offset + 1: offset + 1 + length].decode())
+        offset += length + 1
+    if data[offset + 1: offset + 3] != b"\x00\x01":
+        return None
+    return ".".join(domain_parts)
 
 
 class ServerResponseParser:
     @staticmethod
-    def create_dns_response(query_data, ip):
-        request_id = query_data[:2]  # ID запроса
-        flags = struct.pack(">H", 0x8180)  # Флаги для стандартного ответа
-        qdcount = struct.pack(">H", 1)  # Один вопрос
-        ancount = struct.pack(">H", 1)  # Один ответ
-        nscount = struct.pack(">H", 0)
-        arcount = struct.pack(">H", 0)
+    def create_dns_response(query_data, ips):
+        response_id = query_data[:2]
+        flags = b"\x81\x80"
+        qdcount = b"\x00\x01"
+        ancount = len(query_data).to_bytes(2, byteorder='big')
+        nscount = b"\x00\x00"
+        arcount = b"\x00\x00"
+        header = response_id + flags + qdcount + ancount + nscount + arcount
 
-        question = query_data[12:]  # Вопросная часть запроса
-        answer = b"\xc0\x0c"  # Указатель на доменное имя
-        answer += struct.pack(">HHI", 1, 1, 300)  # Тип A, Класс IN, TTL
-        answer += struct.pack(">H", 4)  # Длина RDATA
-        answer += bytes(map(int, ip.split('.')))  # IP-адрес
+        offset = 12
+        while query_data[offset] != 0:
+            offset += query_data[offset] + 1
+        offset += 5
+        question = query_data[12:offset]
 
-        return request_id + flags + qdcount + ancount + nscount + arcount + question + answer
+        answers = b""
+        for ip in ips:
+            answers += b"\xc0\x0c"
+            answers += b"\x00\x01"
+            answers += b"\x00\x01"
+            answers += b"\x00\x00\x01\x2c"
+            answers += b"\x00\x04"
+            answers += bytes(map(int, ip.split(".")))
+
+        return header + question + answers
 
     @staticmethod
     def create_error_response(query_data):
