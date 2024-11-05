@@ -1,16 +1,28 @@
 import struct
+import random
 
 
 def create_dns_request(domain):
-    request_id = 0x1234
-    flags = 0x0000
-    qdcount, ancount, nscount, arcount = 1, 0, 0, 0
-    header = struct.pack(">HHHHHH", request_id, flags, qdcount, ancount, nscount, arcount)
+    # request_id = 0x1234
+    # flags = 0x0000
+    # qdcount, ancount, nscount, arcount = 1, 0, 0, 0
+    # header = struct.pack(">HHHHHH", request_id, flags, qdcount, ancount, nscount, arcount)
+    #
+    # question = b''.join(struct.pack("B", len(part)) + part.encode('utf-8') for part in domain.split('.')) + b'\x00'
+    # qtype, qclass = 1, 1
+    # question += struct.pack(">HH", qtype, qclass)
+    #
+    # return header + question
 
-    question = b''.join(struct.pack("B", len(part)) + part.encode('utf-8') for part in domain.split('.')) + b'\x00'
-    qtype, qclass = 1, 1
-    question += struct.pack(">HH", qtype, qclass)
-
+    query_id = random.randint(0, 65535)
+    header = query_id.to_bytes(2, "little")
+    header += b"\x01\x00"
+    header += b"\x00\x01"
+    header += b"\x00\x00"
+    header += b"\x00\x00"
+    header += b"\x00\x00"
+    question = b"".join((len(label).to_bytes(1, "little") + label.encode() for label in domain.split(".")))
+    question += b"\x00" + b"\x00\x01" + b"\x00\x01"
     return header + question
 
 

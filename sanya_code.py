@@ -53,13 +53,13 @@ cache = DnsCache()
 
 def create_dns_request(domain_name: str) -> bytes:
     query_id = random.randint(0, 65535)
-    header = query_id.to_bytes(2)
+    header = query_id.to_bytes(2, "little")
     header += b"\x01\x00"
     header += b"\x00\x01"
     header += b"\x00\x00"
     header += b"\x00\x00"
     header += b"\x00\x00"
-    question = b"".join((len(label).to_bytes(1) + label.encode() for label in domain_name.split(".")))
+    question = b"".join((len(label).to_bytes(1, "little") + label.encode() for label in domain_name.split(".")))
     question += b"\x00" + b"\x00\x01" + b"\x00\x01"
     return header + question
 
@@ -77,7 +77,7 @@ def send_dns_request(request: bytes, server_ip: str, port: int = 53) -> bytes | 
 
 
 def parse_dns_answers(response: bytes) -> tuple[list[str], float]:
-    answer_count = int.from_bytes(response[6:8])
+    answer_count = int.from_bytes(response[6:8], "little")
     offset = 12 + len(response[12:].split(b"\x00", 1)[0]) + 5
     answers = []
     ttl = 0xffffffff
@@ -86,11 +86,11 @@ def parse_dns_answers(response: bytes) -> tuple[list[str], float]:
         to_skip = get_length_to_skip(response, offset)
         if (response[offset + to_skip: offset + to_skip + 2] == b"\x00\x01"
                 and response[offset + to_skip + 2: offset + to_skip + 4] == b"\x00\x01"):
-            ttl = min(ttl, int.from_bytes(response[offset + to_skip + 4: offset + to_skip + 8]))
-            rd_length = int.from_bytes(response[offset + to_skip + 8: offset + to_skip + 10])
+            ttl = min(ttl, int.from_bytes(response[offset + to_skip + 4: offset + to_skip + 8], "little"))
+            rd_length = int.from_bytes(response[offset + to_skip + 8: offset + to_skip + 10], "little")
             ip = ".".join(map(str, response[offset + to_skip + 10: offset + to_skip + 10 + rd_length]))
             answers.append(ip)
-        offset += to_skip + 10 + int.from_bytes(response[offset + to_skip + 8: offset + to_skip + 10])
+        offset += to_skip + 10 + int.from_bytes(response[offset + to_skip + 8: offset + to_skip + 10], "little")
 
     return answers, ttl
 
@@ -125,12 +125,12 @@ def resolve_domain(domain_name: str) -> list[str] | None:
 
 
 def parse_additional(response: bytes) -> list[str]:
-    authoritative_count = int.from_bytes(response[8:10])
-    additional_count = int.from_bytes(response[10:12])
+    authoritative_count = int.from_bytes(response[8:10], "little")
+    additional_count = int.from_bytes(response[10:12], "little")
     offset = 12 + len(response[12:].split(b"\x00", 1)[0]) + 5
     for _ in range(authoritative_count):
         to_skip = get_length_to_skip(response, offset)
-        offset += to_skip + 10 + int.from_bytes(response[offset + to_skip + 8: offset + to_skip + 10])
+        offset += to_skip + 10 + int.from_bytes(response[offset + to_skip + 8: offset + to_skip + 10], "little")
     records = []
 
     for _ in range(additional_count):
@@ -138,9 +138,9 @@ def parse_additional(response: bytes) -> list[str]:
         if (response[offset + to_skip: offset + to_skip + 2] == b"\x00\x01"
                 and response[offset + to_skip + 2: offset + to_skip + 4] == b"\x00\x01"):
             ip = ".".join(map(str, response[offset + to_skip + 10: offset + to_skip + 10
-                                                         + int.from_bytes(response[offset + 10: offset + 12])]))
+                                                         + int.from_bytes(response[offset + 10: offset + 12], "little")]))
             records.append(ip)
-        offset += to_skip + 10 + int.from_bytes(response[offset + 10: offset + 12])
+        offset += to_skip + 10 + int.from_bytes(response[offset + 10: offset + 12], "little")
 
     return records
 
@@ -214,7 +214,7 @@ def build_response_message(query_message: bytes, response_ips: list[str]) -> byt
 
 def build_error_response(query_message: bytes, error_code: int) -> bytes:
     response_id = query_message[:2]
-    flags = int.to_bytes(0x8180 + error_code, 2)
+    flags = int.to_bytes(0x8180 + error_code, 2, "little")
     qdcount = b"\x00\x01"
     ancount = b"\x00\x00"
     nscount = b"\x00\x00"
@@ -230,7 +230,7 @@ def build_error_response(query_message: bytes, error_code: int) -> bytes:
     return header + question
 
 
-def start_dns_server(host: str = "127.0.0.1", port: int = 53) -> None:
+def start_dns_server(host: str = "192.168.144.1", port: int = 53) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
         server_socket.bind((host, port))
         logger.info(f"DNS server started on {host}:{port}")
