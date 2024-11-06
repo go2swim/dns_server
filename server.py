@@ -11,7 +11,6 @@ def start_server():
 
     while True:
         data, addr = sock.recvfrom(6413)
-        print('a')
         domain = parse_dns_query(data)
 
         if domain:
@@ -19,7 +18,7 @@ def start_server():
             ip = DNSResolver().resolve(domain)
 
             print(f'ip: {ip}')
-            response = ServerResponseParser.create_dns_response(data, ip[0]) if ip \
+            response = ServerResponseParser.create_dns_response(data, ip) if ip \
                 else ServerResponseParser.create_error_response(data)
             sock.sendto(response, addr)
 

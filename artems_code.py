@@ -101,30 +101,39 @@ def extract_records(count: int, offset: int, response: bytes) -> tuple[list, int
 
 
 def build_response(data: bytes, ip_addresses) -> bytes:
-    id = data[:2]
-    flags = b'\x81\x80'
-    qdcount = b'\x00\x01'
-    ancount = struct.pack('!H', len(ip_addresses))
-    nscount = b'\x00\x00'
-    arcount = b'\x00\x00'
-    question = data[12:]
-    response = id + flags + qdcount + ancount + nscount + arcount + question
+    # Извлечение идентификатора транзакции
+    response = data[:2]
 
+    # Установка флагов для ответа
+    response += b'\x81\x80'
+
+    # Число вопросов и ответов
+    response += b'\x00\x01'  # один вопрос
+    response += struct.pack('!H', len(ip_addresses))  # количество ответов
+    response += b'\x00\x00\x00\x00'  # NSCOUNT и ARCOUNT
+
+    # Копируем вопрос, начиная с 12-го байта
+    response += data[12:]
+
+    # Добавляем ответные записи для каждого IP-адреса
     for ip, ip_type in ip_addresses:
-        name = b'\xc0\x0c'
-        rclass = b'\x00\x01'
-        ttl = struct.pack('!I', 60)
+        # Указываем на вопрос
+        response += b'\xc0\x0c'
 
-        if ip_type == 1: # A
-            rtype = b'\x00\x01'
-            rdlength = b'\x00\x04'
-            rdata = socket.inet_aton(ip)
-        else: # AAAA
-            rtype = b'\x00\x1c'
-            rdlength = b'\x00\x10'
-            rdata = socket.inet_pton(socket.AF_INET6, ip)
+        # Определение типа записи и данных ответа
+        if ip_type == 1:  # A запись (IPv4)
+            response += b'\x00\x01'  # Тип записи A
+            response += b'\x00\x01'  # Класс IN (интернет)
+            response += struct.pack('!I', 60)  # Время жизни записи (TTL)
+            response += b'\x00\x04'  # Длина данных (IPv4 — 4 байта)
+            response += socket.inet_aton(ip)  # Преобразуем IP в байты
+        elif ip_type == 28:  # AAAA запись (IPv6)
+            response += b'\x00\x1c'  # Тип записи AAAA
+            response += b'\x00\x01'  # Класс IN (интернет)
+            response += struct.pack('!I', 60)  # Время жизни записи (TTL)
+            response += b'\x00\x10'  # Длина данных (IPv6 — 16 байт)
+            response += socket.inet_pton(socket.AF_INET6, ip)  # Преобразуем IPv6 в байты
 
-        response += name + rtype + rclass + ttl + rdlength + rdata
     return response
 
 
