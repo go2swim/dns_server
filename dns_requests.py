@@ -1,6 +1,12 @@
 import socket
 
-from constants_and_exceptions import ROOT_SERVERS, DNSError, DNSNXDomainError, DNSTimeoutError, DNSFormatError
+from constants_and_exceptions import (
+    ROOT_SERVERS,
+    DNSError,
+    DNSNXDomainError,
+    DNSTimeoutError,
+    DNSFormatError,
+)
 from dns_parsing import create_dns_request, DNSParser
 
 
@@ -16,9 +22,11 @@ class DNSResolver:
             for server in current_servers:
                 try:
                     response = self._query_dns(server, domain)
-                    print(f'Response from {server}: {response}')
+                    print(f"Response from {server}: {response}")
 
-                    answers, authority, additional = DNSParser.parse_dns_response(response)
+                    answers, authority, additional = DNSParser.parse_dns_response(
+                        response
+                    )
                     ip_addresses = self._extract_ip_addresses(answers)
 
                     if ip_addresses:
@@ -28,7 +36,12 @@ class DNSResolver:
                     if next_servers:
                         current_servers = next_servers
                         break
-                except (DNSTimeoutError, DNSNXDomainError, DNSFormatError, DNSError) as e:
+                except (
+                    DNSTimeoutError,
+                    DNSNXDomainError,
+                    DNSFormatError,
+                    DNSError,
+                ) as e:
                     print(f"Error with server {server}: {e}")
                     continue
         return None
@@ -48,16 +61,23 @@ class DNSResolver:
     def _get_next_servers(self, authority, additional):
         next_servers = []
         for record in authority:
-            if record[1] == 2:  # NS-запись
+            if record[1] == 2:
                 ns_ip = self._find_ip(additional, record[2])
                 if ns_ip:
                     next_servers.append(ns_ip)
                 else:
-                    # Если IP для NS-записи не найден, резолвим его рекурсивно
+
                     ns_ips = self.resolve(record[2])
                     if ns_ips:
                         next_servers.extend(ns_ips)
         return next_servers
 
     def _find_ip(self, additional, ns_name):
-        return next((record[2] for record in additional if record[0] == ns_name and record[1] in (1, 28)), None)
+        return next(
+            (
+                record[2]
+                for record in additional
+                if record[0] == ns_name and record[1] in (1, 28)
+            ),
+            None,
+        )

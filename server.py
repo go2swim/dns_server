@@ -6,7 +6,7 @@ import socket
 
 def start_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", DNS_PORT))
+    sock.bind(("127.0.0.1", DNS_PORT))
     print("DNS сервер запущен...")
 
     while True:
@@ -17,9 +17,12 @@ def start_server():
             print(f"Запрос получен для домена: {domain}")
             ip = DNSResolver().resolve(domain)
 
-            print(f'ip: {ip}')
-            response = ServerResponseParser.create_dns_response(data, ip) if ip \
+            print(f"ip: {ip}")
+            response = (
+                ServerResponseParser.create_dns_response(data, ip)
+                if ip
                 else ServerResponseParser.create_error_response(data)
+            )
             sock.sendto(response, addr)
 
 
