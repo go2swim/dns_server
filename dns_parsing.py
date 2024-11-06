@@ -40,20 +40,31 @@ def parse_dns_query(data):
 class ServerResponseParser:
     @staticmethod
     def create_dns_response(query_data, ip):
-        request_id = query_data[:2]  # ID запроса
-        flags = struct.pack(">H", 0x8180)  # Флаги для стандартного ответа
-        qdcount = struct.pack(">H", 1)  # Один вопрос
-        ancount = struct.pack(">H", 1)  # Один ответ
-        nscount = struct.pack(">H", 0)
-        arcount = struct.pack(">H", 0)
+        id = data[:2]
+        flags = b'\x81\x80'
+        qdcount = b'\x00\x01'
+        ancount = struct.pack('!H', len(ip_addresses))
+        nscount = b'\x00\x00'
+        arcount = b'\x00\x00'
+        question = data[12:]
+        response = id + flags + qdcount + ancount + nscount + arcount + question
 
-        question = query_data[12:]  # Вопросная часть запроса
-        answer = b"\xc0\x0c"  # Указатель на доменное имя
-        answer += struct.pack(">HHI", 1, 1, 300)  # Тип A, Класс IN, TTL
-        answer += struct.pack(">H", 4)  # Длина RDATA
-        answer += bytes(map(int, ip.split('.')))  # IP-адрес
+        for ip, ip_type in ip_addresses:
+            name = b'\xc0\x0c'
+            rclass = b'\x00\x01'
+            ttl = struct.pack('!I', 60)
 
-        return request_id + flags + qdcount + ancount + nscount + arcount + question + answer
+            if ip_type == 1:  # A
+                rtype = b'\x00\x01'
+                rdlength = b'\x00\x04'
+                rdata = socket.inet_aton(ip)
+            else:  # AAAA
+                rtype = b'\x00\x1c'
+                rdlength = b'\x00\x10'
+                rdata = socket.inet_pton(socket.AF_INET6, ip)
+
+            response += name + rtype + rclass + ttl + rdlength + rdata
+        return response
 
     @staticmethod
     def create_error_response(query_data):
