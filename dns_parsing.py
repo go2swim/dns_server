@@ -39,32 +39,31 @@ def parse_dns_query(data):
 
 class ServerResponseParser:
     @staticmethod
-    def create_dns_response(query_data, ip):
-        id = data[:2]
-        flags = b'\x81\x80'
-        qdcount = b'\x00\x01'
-        ancount = struct.pack('!H', len(ip_addresses))
-        nscount = b'\x00\x00'
-        arcount = b'\x00\x00'
-        question = data[12:]
-        response = id + flags + qdcount + ancount + nscount + arcount + question
+    def create_dns_response(query_data, ips):
+        response_id = query_data[:2]
+        flags = b"\x81\x80"
+        qdcount = b"\x00\x01"
+        ancount = len(ips).to_bytes(2, byteorder='big')
+        nscount = b"\x00\x00"
+        arcount = b"\x00\x00"
+        header = response_id + flags + qdcount + ancount + nscount + arcount
 
-        for ip, ip_type in ip_addresses:
-            name = b'\xc0\x0c'
-            rclass = b'\x00\x01'
-            ttl = struct.pack('!I', 60)
+        offset = 12
+        while query_data[offset] != 0:
+            offset += query_data[offset] + 1
+        offset += 5
+        question = query_data[12:offset]
 
-            if ip_type == 1:  # A
-                rtype = b'\x00\x01'
-                rdlength = b'\x00\x04'
-                rdata = socket.inet_aton(ip)
-            else:  # AAAA
-                rtype = b'\x00\x1c'
-                rdlength = b'\x00\x10'
-                rdata = socket.inet_pton(socket.AF_INET6, ip)
+        answers = b""
+        for ip in ips:
+            answers += b"\xc0\x0c"
+            answers += b"\x00\x01"
+            answers += b"\x00\x01"
+            answers += b"\x00\x00\x01\x2c"
+            answers += b"\x00\x04"
+            answers += bytes(map(int, ip.split(".")))
 
-            response += name + rtype + rclass + ttl + rdlength + rdata
-        return response
+        return header + question + answers
 
     @staticmethod
     def create_error_response(query_data):
