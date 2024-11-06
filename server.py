@@ -6,7 +6,7 @@ import socket
 
 def start_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("127.0.0.1", DNS_PORT))
+    sock.bind(("192.168.144.1", DNS_PORT))
     print("DNS сервер запущен...")
 
     while True:
